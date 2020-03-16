@@ -1,0 +1,74 @@
+---
+# - hosts: devops
+#   remote_user: ansible
+#   become: True
+#   become_method: sudo
+#   become_user: root
+#   gather_facts: no
+#   vars:
+#     remotly_dir: /opt
+#     remotly_file: /home/ansible/tomcatinst/apache-tomcat-9.0.31.tar.gz
+#     tomcat_port: 8007
+#   tasks:
+#- name: delete user
+#  command: userdel tomcat2
+#- name: delete group
+#  command: groupdel tomcat2
+
+- name: add group "tomcat2"
+  group: name=tomcat2
+
+- name: add user "tomcat2"
+  command: useradd -s /bin/false -g tomcat2 -d /opt/tomcat2/ tomcat2
+
+- name: Set JAVA_HOME environment variable
+  lineinfile: dest='/etc/environment' regexp='^#?\s*export JAVA_HOME=(.*)$' line='export JAVA_HOME=/usr/local/java/jdk-13.0.2' state=present
+
+- name: Set JAVA_HOME environment variable
+  lineinfile: dest='/home/ansible/.bashrc' regexp='^#?\s*export JAVA_HOME=(.*)$' line='export JAVA_HOME=/usr/local/java/jdk-13.0.2' state=present
+
+- name: restart bashrc
+  shell: nohup source /home/ansible/.bashrc &
+
+
+- name: copy file to remote machine
+  copy: src={{remotly_file}} dest={{remotly_dir}}
+
+#     - name: copy extraction file
+#       copy:
+#         src: /home/ansible/roles2/tomcat/tomcatinst/apache-tomcat-9.0.31/
+#         dest: /opt/tomcat2/
+
+- name: Extract file
+  command: tar xvfz /opt/apache-tomcat-9.0.31.tar.gz -C /opt
+
+- name: move content of extraction file under tomcat2
+  command: mv /opt/apache-tomcat-9.0.31 /opt/tomcat2
+
+- name: change permission to tomcat2
+  command: chown -R tomcat2:tomcat2 /opt/tomcat2
+
+- name: change bin permission
+  command: chmod +x /opt/tomcat2/bin/
+
+- name: Set CATALINA_HOME environment variable
+  lineinfile: dest='/home/ansible/.bashrc' regexp='^#?\s*export CATALINA_HOME=(.*)$' line='export CATALINA_HOME=/opt/tomcat2' state=present
+
+- name: restart bashrc
+  shell: nohup source /home/ansible/.bashrc &
+
+- name: start tomcat
+  command: "nohup /opt/tomcat2/bin/startup.sh"
+
+- name: change bin permission
+  command: chmod +x /opt/tomcat2/conf/
+
+- name: Configure Tomcat server
+  copy: src=/home/ansible/server.xml dest=/opt/tomcat2/conf/
+
+
+- name: stop catalina
+  command: "nohup /opt/tomcat2/bin/catalina.sh stop"
+
+- name: start catalina
+  command: "nohup /opt/tomcat2/bin/catalina.sh start"
